@@ -232,7 +232,7 @@ client = Client()
 print("\n=== Running ADVANCED pipeline experiment ===")
 results_advanced = evaluate(
     lambda inputs: adv_rag.query(inputs["question"]),
-    data="Alex_Management_Benchmark_v6",
+    data="Alex_Management_Benchmark_v7",
     evaluators=[quality_evaluator, retrieval_evaluator, ragas_evaluator],
     experiment_prefix="Alex-Advanced",
 )
@@ -240,7 +240,7 @@ results_advanced = evaluate(
 print("\n=== Running BASELINE pipeline experiment ===")
 results_baseline = evaluate(
     lambda inputs: baseline_rag.query(inputs["question"]),
-    data="Alex_Management_Benchmark_v6",
+    data="Alex_Management_Benchmark_v7",
     evaluators=[quality_evaluator, retrieval_evaluator, ragas_evaluator],
     experiment_prefix="Alex-Baseline",
 )
