@@ -40,8 +40,9 @@ adv_rag = AdvancedRAGPipeline(vector_db.as_retriever(), llm)
 # Judge: gpt-4o — stronger model, different tier, avoids self-evaluation bias.
 judge_llm = ChatOpenAI(
     openai_api_key=os.getenv("OPENAI_API_KEY"),
-    model_name="gpt-4o",
-    temperature=0,
+    model_name="gpt-4o",\
+    temperature=0,\
+    model_kwargs={"n": 1},
 )
 
 # Configure RAGAS singletons with the judge LLM and local BGE embeddings.
@@ -187,74 +188,12 @@ def ragas_evaluator(run, example):
     }
 
 
-class BaselineRAGPipeline:
-    """
-    Naïve single-query FAISS retrieval — no HyDE expansion, no BM25,
-    no cross-encoder reranking. Same LLM and system prompt as the advanced
-    pipeline so the comparison isolates retrieval quality only.
-    """
-    def __init__(self, retriever, llm):
-        self.retriever = retriever
-        self.llm = llm
-
-    def query(self, question: str, top_k: int = 5):
-        docs = self.retriever.invoke(question)[:top_k]
-        context = "\n\n---\n\n".join([d.page_content for d in docs])
-        system_prompt = f"""
-            You are "Alex", a Senior Evidence-Based Management (EBM) Consultant.
-            Answer the question using ONLY the information in the CONTEXT below.
-            Do not use outside knowledge. If the context does not cover the question,
-            say so explicitly.
-
-            CONTEXT:
-            {context}
-
-            QUESTION:
-            {question}
-
-            ALEX'S EBM STRATEGIC ADVICE:
-        """
-        response = self.llm.invoke(system_prompt)
-        return {
-            "answer": response.content,
-            "retrieved_contexts": [d.page_content for d in docs],
-            "retrieved_docs": [
-                {"book": d.metadata["source"], "page": d.metadata["page"]}
-                for d in docs
-            ],
-        }
-
-
-baseline_rag = BaselineRAGPipeline(vector_db.as_retriever(), llm)
-
 client = Client()
 
 print("\n=== Running ADVANCED pipeline experiment ===")
 results_advanced = evaluate(
     lambda inputs: adv_rag.query(inputs["question"]),
-    data="Alex_Management_Benchmark_v7",
+    data="Alex_Management_Benchmark_v8",
     evaluators=[quality_evaluator, retrieval_evaluator, ragas_evaluator],
     experiment_prefix="Alex-Advanced",
 )
-
-print("\n=== Running BASELINE pipeline experiment ===")
-results_baseline = evaluate(
-    lambda inputs: baseline_rag.query(inputs["question"]),
-    data="Alex_Management_Benchmark_v7",
-    evaluators=[quality_evaluator, retrieval_evaluator, ragas_evaluator],
-    experiment_prefix="Alex-Baseline",
-)
-
-print("\n=== COMPARISON SUMMARY ===")
-import pandas as pd
-adv_df  = results_advanced.to_pandas()
-base_df = results_baseline.to_pandas()
-metrics = ["answer_relevance","conciseness","groundedness","mrr",
-           "precision_at_k","recall_at_k",
-           "ragas_faithfulness","ragas_context_precision","ragas_answer_relevancy"]
-for m in metrics:
-    if m in adv_df.columns and m in base_df.columns:
-        a = pd.to_numeric(adv_df[m], errors="coerce").mean()
-        b = pd.to_numeric(base_df[m], errors="coerce").mean()
-        delta = a - b
-        print(f"{m:35s}  Advanced={a:.3f}  Baseline={b:.3f}  Δ={delta:+.3f}")

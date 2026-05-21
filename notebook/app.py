@@ -120,10 +120,15 @@ class AdvancedRAGPipeline:
 
         # HyDE query expansion
         expansion_prompt = f"""
-        Re-write "{question}" into 3 strategic search queries.
-        1. Focus on core frameworks.
-        2. Focus on actionable solutions.
-        Output only queries, one per line.
+        Re-write "{question}" into 3 search queries for a management and finance knowledge base.
+        Rules:
+        - Use only management, finance, psychology, and organisational behaviour terminology.
+        - Do not invent concepts not grounded in these domains.
+        - Each query must be a natural search phrase, not a sentence.
+        1. Focus on the core concept or framework.
+        2. Focus on practical application or evidence.
+        3. Focus on a related principle or adjacent concept.
+        Output only the 3 queries, one per line, no numbering or labels.
         """
         expanded_queries_response = self.llm.invoke(expansion_prompt)
         queries = [question] + expanded_queries_response.content.strip().split("\n")
@@ -151,7 +156,7 @@ class AdvancedRAGPipeline:
         # cover the question well — flag it so the prompt triggers the honest-limits response
         # instead of letting Alex hallucinate to fill the gap.
         CHUNK_THRESHOLD = -10.0
-        COVERAGE_THRESHOLD = -6.0
+        COVERAGE_THRESHOLD = -8.5
         MIN_CHUNK_WORDS = 30  # filter copyright headers, TOC pages, "Notes:" pages
 
         low_coverage = False
@@ -178,6 +183,8 @@ class AdvancedRAGPipeline:
                 relevant_chunks = [doc for score, doc in scored[:top_k]]
 
             print(f"Best reranker score: {best_score:.3f} | low_coverage: {low_coverage}")
+            if low_coverage:
+                print(f"[LOW COVERAGE] Question triggered hedge: '{question[:80]}...' | score={best_score:.3f}")
         else:
             low_coverage = True
             relevant_chunks = unique_docs[:top_k]
@@ -238,7 +245,7 @@ class AdvancedRAGPipeline:
             ### STYLE
             - **Natural & Direct**: Talk like a sharp senior consultant — no rigid section headers.
             - **Empathetic Opener**: Briefly acknowledge the user's situation, then get straight to the point.
-            - **Concise**: Readable in under a minute. Bullet points for actions, minimal prose around them.
+            - **Concise**: 150–250 words maximum. Bullet points for actions, minimal prose around them. Never exceed 300 words.
             - **No Jargon**: Plain business language. Define technical terms in one sentence if needed.
 
             ---
