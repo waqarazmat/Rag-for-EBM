@@ -14,3 +14,9 @@ data/vector_store/
 # Virtual environments
 .venv
 
+
+# Environment secrets
+.env
+
+# macOS
+.DS_Store
