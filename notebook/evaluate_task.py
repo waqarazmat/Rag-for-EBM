@@ -165,27 +165,47 @@ def ragas_evaluator(run, example):
     contexts     = run.outputs.get("retrieved_contexts") or []
     ground_truth = example.outputs.get("ground_truth", "")
 
-    dataset = Dataset.from_dict({
-        "question":    [question],
-        "answer":      [answer],
-        "contexts":    [contexts],
-        "ground_truth":[ground_truth],
-    })
+    # Guard: RAGAS crashes on empty strings — return zero scores gracefully.
+    if not answer or not contexts or not ground_truth:
+        return {
+            "results": [
+                {"key": "ragas_faithfulness",      "score": 0.0},
+                {"key": "ragas_answer_relevancy",  "score": 0.0},
+                {"key": "ragas_context_precision", "score": 0.0},
+            ]
+        }
 
-    result = ragas_evaluate(
-        dataset,
-        metrics=[faithfulness, answer_relevancy, context_precision],
-    )
+    try:
+        dataset = Dataset.from_dict({
+            "question":    [question],
+            "answer":      [answer],
+            "contexts":    [contexts],
+            "ground_truth":[ground_truth],
+        })
 
-    row = result.to_pandas().iloc[0]
+        result = ragas_evaluate(
+            dataset,
+            metrics=[faithfulness, answer_relevancy, context_precision],
+        )
 
-    return {
-        "results": [
-            {"key": "ragas_faithfulness",      "score": float(row.get("faithfulness",     0.0))},
-            {"key": "ragas_answer_relevancy",  "score": float(row.get("answer_relevancy", 0.0))},
-            {"key": "ragas_context_precision", "score": float(row.get("context_precision",0.0))},
-        ]
-    }
+        row = result.to_pandas().iloc[0]
+
+        return {
+            "results": [
+                {"key": "ragas_faithfulness",      "score": float(row.get("faithfulness",     0.0))},
+                {"key": "ragas_answer_relevancy",  "score": float(row.get("answer_relevancy", 0.0))},
+                {"key": "ragas_context_precision", "score": float(row.get("context_precision",0.0))},
+            ]
+        }
+    except Exception as e:
+        print(f"[RAGAS ERROR] {type(e).__name__}: {e}")
+        return {
+            "results": [
+                {"key": "ragas_faithfulness",      "score": 0.0},
+                {"key": "ragas_answer_relevancy",  "score": 0.0},
+                {"key": "ragas_context_precision", "score": 0.0},
+            ]
+        }
 
 
 client = Client()
@@ -195,5 +215,5 @@ results_advanced = evaluate(
     lambda inputs: adv_rag.query(inputs["question"]),
     data="Alex_Management_Benchmark_v8",
     evaluators=[quality_evaluator, retrieval_evaluator, ragas_evaluator],
-    experiment_prefix="Alex-Advanced",
+    experiment_prefix="Alex-Advanced-v2",
 )

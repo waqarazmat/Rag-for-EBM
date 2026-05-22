@@ -156,7 +156,7 @@ class AdvancedRAGPipeline:
         # cover the question well — flag it so the prompt triggers the honest-limits response
         # instead of letting Alex hallucinate to fill the gap.
         CHUNK_THRESHOLD = -10.0
-        COVERAGE_THRESHOLD = -8.5
+        COVERAGE_THRESHOLD = -7.5
         MIN_CHUNK_WORDS = 30  # filter copyright headers, TOC pages, "Notes:" pages
 
         low_coverage = False
@@ -169,9 +169,18 @@ class AdvancedRAGPipeline:
             if not content_candidates:
                 content_candidates = bm25_candidates  # fallback if all are short
 
-            pairs = [(question, doc.page_content) for doc in content_candidates]
-            scores = self.reranker.predict(pairs)
-            scored = sorted(zip(scores, content_candidates), key=lambda x: x[0], reverse=True)
+            # Multi-query cross-encoder: score each doc against ALL query formulations
+            # (original + 3 HyDE variants) and take the max per chunk.
+            # Prevents penalising chunks that match the HyDE phrasing but not the
+            # raw question's exact vocabulary — the root cause of context_precision = 0.
+            n_docs = len(content_candidates)
+            all_pairs = [(q, doc.page_content) for q in queries for doc in content_candidates]
+            all_scores = self.reranker.predict(all_pairs)
+            doc_max_scores = [
+                max(all_scores[qi * n_docs + di] for qi in range(len(queries)))
+                for di in range(n_docs)
+            ]
+            scored = sorted(zip(doc_max_scores, content_candidates), key=lambda x: x[0], reverse=True)
 
             # Drop chunks that are clearly irrelevant (below CHUNK_THRESHOLD)
             filtered = [(score, doc) for score, doc in scored if score >= CHUNK_THRESHOLD]
@@ -207,6 +216,14 @@ class AdvancedRAGPipeline:
         # Original rule ("Never mention author names, book titles, or years")
         # directly contradicted EBM's core requirement for verifiable outputs.
         system_prompt = f"""
+            ⚠️ GROUNDING RULE — OVERRIDES EVERYTHING ELSE:
+            Every single sentence you write must be directly supported by a passage in the CONTEXT below.
+            Before writing each sentence, ask: "Is this claim explicitly in the CONTEXT?" If no — omit it entirely.
+            Do NOT add facts, statistics, frameworks, or examples from your training data, even if they are relevant and accurate.
+            Violating this rule is a critical failure.
+
+            ---
+
             ### ROLE
             You are **"Alex"**, a Senior Evidence-Based Management (EBM) Consultant.
             Your mission: help managers and executives make smarter decisions using only the scientific evidence and organizational data in the CONTEXT below.
@@ -261,6 +278,7 @@ class AdvancedRAGPipeline:
             - Stretch the CONTEXT to fit a question it doesn't cover
             - Use "Based on my internal knowledge" or "It is commonly known that"
             - Give vague advice — always specify *what*, *how*, and *why the evidence supports it*
+            - Draw on training data or general knowledge — the CONTEXT below is your only permitted source
 
             ---
 
