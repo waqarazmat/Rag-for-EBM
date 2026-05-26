@@ -1,8 +1,5 @@
-# Use CPU-only PyTorch — keeps the Docker image small on Streamlit Cloud
---extra-index-url https://download.pytorch.org/whl/cpu
-
 streamlit
-plotly
+plotly>=5.0.0
 python-dotenv
 numpy
 httpx
