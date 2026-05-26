@@ -17,6 +17,7 @@ data/vector_store/
 
 # Environment secrets
 .env
+.streamlit/secrets.toml
 
 # macOS
 .DS_Store

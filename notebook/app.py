@@ -17,6 +17,14 @@ from langchain_core.embeddings import Embeddings
 
 load_dotenv()
 
+# ── Streamlit Cloud: pull secrets into env so the rest of the code stays unchanged ──
+try:
+    for _key in ("OPENAI_API_KEY", "LANGSMITH_API_KEY", "GROQ_API_KEY"):
+        if _key in st.secrets and not os.environ.get(_key):
+            os.environ[_key] = st.secrets[_key]
+except Exception:
+    pass  # Running locally without secrets.toml — .env is used instead
+
 def auto_classify(doc) -> str:
     """
     Automatically classify a document as 'academic' or 'practitioner'
@@ -410,8 +418,16 @@ def get_vector_db(_llm):
 # FIX 9: Removed httpx.Client(verify=False) — SSL verification must not be
 # disabled in a research/production system. If SSL errors occur, fix the
 # certificate store rather than bypassing verification.
-st.set_page_config(page_title="RAG Assistant", layout="wide")
-st.title("🤖 RAG ChatBot")
+st.set_page_config(
+    page_title="Alex — EBM Advisor",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        "About": "**Alex** — Evidence-Based Management Advisor. Built with RAG + FAISS + GPT-4o-mini.",
+    },
+)
+st.title("🤖 Alex — Evidence-Based Management Advisor")
 
 st.sidebar.header("Pipeline Settings")
 show_summary = st.sidebar.checkbox("Show Summary", value=True)

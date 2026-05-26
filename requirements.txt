@@ -1,33 +1,30 @@
+# Use CPU-only PyTorch — keeps the Docker image small on Streamlit Cloud
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 streamlit
 python-dotenv
 numpy
 httpx
+
+# LangChain ecosystem
 langchain
 langchain-core
 langchain-community
 langchain-text-splitters
-langchain-groq
 langchain-openai
-langgraph
+langchain-groq
+
+# Vector store + retrieval
 faiss-cpu
-chromadb
 rank-bm25
-typesense
-pymupdf
-pypdf
-sentence-transformers
-streamlit
-python-dotenv
-numpy
-httpx
-rank_bm25
+
+# Embeddings + reranking
 torch
 sentence-transformers
-langchain
-langchain-groq
-langchain-community
-langchain-text-splitters
-faiss-cpu
+
+# PDF loading
 pymupdf
+
+# Evaluation / tracing
 langsmith
 pydantic
