@@ -109,13 +109,21 @@ class SimpleEmbeddings(Embeddings):
         return self._encoder.encode([text], normalize_embeddings=True)[0].tolist()
 
 
+# Load the reranker once per process. Re-instantiating it on every Streamlit rerun
+# triggers "meta tensor" NotImplementedError on recent torch/transformers.
+@st.cache_resource
+def get_reranker():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    return CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", device=device)
+
+
 class AdvancedRAGPipeline:
     def __init__(self, retriever, llm):
         self.retriever = retriever
         self.llm = llm
         # FIX 5: Cross-encoder reranker replaces the LLM YES/NO batch grader.
         # CrossEncoder jointly encodes (query, doc) pairs — proper relevance scoring.
-        self.reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        self.reranker = get_reranker()
         self.history = []
 
     def query(self, question: str, top_k: int = 5, min_score: float = 0.0, summarize: bool = False):
